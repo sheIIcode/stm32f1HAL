@@ -115,11 +115,11 @@ uint32_t total, free_space;
 volatile uint8_t bufIdx, writeCnt, dmaBufIdx;
 volatile uint16_t bufCnt, endval, stop2, stop1;
 //uint8_t buf[2][BUFF_SIZE];
-uint8_t buf[BUFF_SIZE];
-uint16_t stamps[2][256];
+uint8_t buf[2][BUFF_SIZE];
+uint8_t buf2[2][BUFF_SIZE];
+uint16_t stamps[2][64];
 volatile uint8_t stampsIdx;
-volatile uint8_t b[BUFF_SIZE];
-
+//volatile uint8_t b[BUFF_SIZE];
 
 /* USER CODE END 0 */
 
@@ -180,16 +180,16 @@ int main(void)
 	HAL_TIM_Base_Start(&htim3);
 
 //	HAL_ADC_Start_IT(&hadc1);
-	HAL_ADC_Start_DMA(&hadc1, (uint8_t*)buf, BUFF_SIZE);
+	HAL_ADC_Start_DMA(&hadc1, (uint8_t*)buf, 2*BUFF_SIZE);
 	uint32_t ADC_DR = hdma_adc1.Instance->CPAR;
 	hdma_adc1.Instance->CPAR = ADC_DR+1;
 
 	//	uint16_t stop0 = htim4.Instance->CNT;
 
-	for(int i; i< BUFF_SIZE; i++){
-		b[i] = 0;
-	}
-	dmaBufIdx = 0;
+//	for(int i; i< BUFF_SIZE; i++){
+//		b[i] = 0;
+//	}
+//	dmaBufIdx = 0;
 
 //	uint8_t b[] = {1,1,2,3};
 //	f_lseek(&fil, 4);
@@ -383,9 +383,9 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 72;
+  htim3.Init.Prescaler = 9-1;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 10000-1;
+  htim3.Init.Period = 1000-1;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -428,9 +428,9 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 72;
+  htim4.Init.Prescaler = 7200-1;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 10001;
+  htim4.Init.Period = 10000-1;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
@@ -508,33 +508,41 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-//void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
-//	stamps[stampsIdx++] = htim4.Instance->CNT;
-//}
 
-//ile zajmie kopiowanie  512 x 2B i procesowanie do 512 x 1B
+
 //przelaczanie buforaw conv halfcplt, albo przelacznie w conv cpl dma nainny buf
-
+// ustaw timer zeby lapal kilka pelnych dma irq, sprawdz stamps
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
 	HAL_TIM_Base_Stop(&htim3);
 
-	uint8_t start = dmaBufIdx;
-	for(dmaBufIdx; dmaBufIdx < 5+ start; dmaBufIdx++){
-		b[dmaBufIdx] = buf[dmaBufIdx];
-	}
+//	uint8_t start = dmaBufIdx;
+//	for(dmaBufIdx; dmaBufIdx < 5+ start; dmaBufIdx++){
+//		b[dmaBufIdx] = buf[dmaBufIdx];
+//	}
+
+
+	stamps[0][stampsIdx++] = htim4.Instance->CNT;
+
+//	for(int i  = 0; i < BUFF_SIZE; i++){
+//		buf2[1][i] = buf[1][i];
+//	}
 
 	HAL_TIM_Base_Start(&htim3);
 }
 
 void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
 	HAL_TIM_Base_Stop(&htim3);
-	uint8_t start = dmaBufIdx;
 
-	for(dmaBufIdx; dmaBufIdx < 5+ start; dmaBufIdx++){
-		b[dmaBufIdx] = buf[dmaBufIdx];
-	}
+//	for(dmaBufIdx; dmaBufIdx < 5+ start; dmaBufIdx++){
+//		b[dmaBufIdx] = buf[dmaBufIdx];
+//	}
 
 	stamps[1][stampsIdx++] = htim4.Instance->CNT;
+
+//	for(int i = 0 ; i < BUFF_SIZE; i++){
+//		buf2[0][i] = buf[0][i];
+//	}
+
 	HAL_TIM_Base_Start(&htim3);
 }
 
@@ -560,20 +568,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 //		}
 //	}
 
-	HAL_TIM_Base_Stop(&htim3);
-	HAL_TIM_Base_Stop(&htim4);
-
-	uint32_t v = hadc1.Instance->DR;
-
-
-	HAL_TIM_Base_Start(&htim3);
-	HAL_TIM_Base_Start_IT(&htim4);
-	htim4.Instance->CNT = 0;
-	htim3.Instance->CNT = 0;
 
 
 	if (htim->Instance == htim4.Instance){	//1hz
-		if(writeCnt <32){
+
+		HAL_TIM_Base_Stop(&htim3);
+		HAL_TIM_Base_Stop(&htim4);
+
+
+		HAL_TIM_Base_Start(&htim3);
+		HAL_TIM_Base_Start_IT(&htim4);
+
+//		if(writeCnt <32){
 	//			HAL_TIM_Base_Stop_IT(&htim3);
 	//			HAL_TIM_Base_Stop_IT(&htim4);
 //				FRESULT res = f_write(&fil, buf[bufIdx], sizeof(buf[bufIdx]), &bw);// replace with direct write
@@ -591,9 +597,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 //			stop2 = htim4.Instance->CNT;
 //			HAL_TIM_Base_Stop_IT(&htim3);
 //			blink_good(3);
-		}
-		htim4.Instance->CNT = 0;
+//		}
+//		htim4.Instance->CNT = 0;
 	} // if tim4
+
 }
 
 void DMA1_Stream3_IRQHandler(DMA_HandleTypeDef *hdma){
