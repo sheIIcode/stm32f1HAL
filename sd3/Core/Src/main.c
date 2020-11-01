@@ -26,7 +26,7 @@
 #include "fatfs_sd.h"
 #include "string.h"
 #include "stdio.h"
-#include "sine.h"
+//#include "sine.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -84,9 +84,9 @@ void blink_bad(){
 void blink_good(int val){
 	for(int i = 0; i < val; i++){
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-		HAL_Delay(400);
+		HAL_Delay(300);
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-		HAL_Delay(400);
+		HAL_Delay(300);
 	}
 }
 
@@ -112,13 +112,13 @@ FATFS *pfs;
 DWORD fre_clust;
 uint32_t total, free_space;
 
-volatile uint8_t bufIdx, writeCnt, dmaBufIdx;
-volatile uint16_t bufCnt, endval, stop2, stop1;
+volatile uint8_t bufIdx;
+volatile uint16_t bufCnt;
 //uint8_t buf[2][BUFF_SIZE];
 uint8_t buf[2][BUFF_SIZE];
-uint8_t buf2[2][BUFF_SIZE];
-uint16_t stamps[2][64];
-volatile uint8_t stampsIdx;
+//uint8_t buf2[2][BUFF_SIZE];
+//uint16_t stamps[2][64];
+//volatile uint8_t stampsIdx;
 //volatile uint8_t b[BUFF_SIZE];
 
 /* USER CODE END 0 */
@@ -159,17 +159,17 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-//  uint8_t wavHeader[] = {0x52, 0x49, 0x46, 0x46, 0x22, 0x20, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74, 0x20,
-//		  0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x80, 0x3e, 0x00, 0x00, 0x80, 0x3e, 0x00, 0x00,
-//		  0x01, 0x00, 0x08, 0x00, 0x64, 0x61, 0x74, 0x61, 0xfe, 0x1f, 0x00, 0x00};
-  writeCnt = 0;
+  uint8_t wavHeader[] = {0x52, 0x49, 0x46, 0x46, 0x24, 0x88, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74, 0x20,
+		  0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x40, 0x1f, 0x00, 0x00, 0x40, 0x1f, 0x00, 0x00,
+		  0x01, 0x00, 0x08, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x88, 0x00, 0x00};
+  bufIdx = 0;
 
-//  fresult = f_mount(&fs, "", 0);
+    fresult = f_mount(&fs, "", 0);
+	fresult = f_open(&fil, "f1.wav", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
+	if(fresult != FR_OK)
+		blink_bad();
 
-  /* Open file to write/ create a file if it doesn't exist */
-//	fresult = f_open(&fil, "f1.txt", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
-//	if(fresult != FR_OK)
-//		blink_bad();
+	f_write(&fil, wavHeader, sizeof(wavHeader), &bw);
 
 //	blink_good(2);
 	/* Writing text */
@@ -179,19 +179,12 @@ int main(void)
 
 	HAL_TIM_Base_Start(&htim3);
 
-//	HAL_ADC_Start_IT(&hadc1);
 	HAL_ADC_Start_DMA(&hadc1, (uint8_t*)buf, 2*BUFF_SIZE);
 	uint32_t ADC_DR = hdma_adc1.Instance->CPAR;
 	hdma_adc1.Instance->CPAR = ADC_DR+1;
 
-	//	uint16_t stop0 = htim4.Instance->CNT;
 
-//	for(int i; i< BUFF_SIZE; i++){
-//		b[i] = 0;
-//	}
-//	dmaBufIdx = 0;
-
-//	uint8_t b[] = {1,1,2,3};
+	/*
 //	f_lseek(&fil, 4);
 //	f_write(&fil, b, 4, &bw);
 
@@ -202,7 +195,6 @@ int main(void)
 //	 stop2 = htim4.Instance->CNT;
 //	fresult = f_close(&fil);
 
-/*
 	i = 0;
 	f_write(&fil, wavHeader, sizeof(wavHeader), &bw);
 
@@ -228,10 +220,6 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  blink_beacon();
-	  if(stampsIdx > 12)
-	  {
-		  HAL_GetTick();
-	  }
   }
   /* USER CODE END 3 */
 }
@@ -509,76 +497,66 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-
-//przelaczanie buforaw conv halfcplt, albo przelacznie w conv cpl dma nainny buf
-// ustaw timer zeby lapal kilka pelnych dma irq, sprawdz stamps
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
-	HAL_TIM_Base_Stop(&htim3);
-
-//	uint8_t start = dmaBufIdx;
-//	for(dmaBufIdx; dmaBufIdx < 5+ start; dmaBufIdx++){
-//		b[dmaBufIdx] = buf[dmaBufIdx];
-//	}
-
-
-	stamps[0][stampsIdx++] = htim4.Instance->CNT;
-
-//	for(int i  = 0; i < BUFF_SIZE; i++){
-//		buf2[1][i] = buf[1][i];
-//	}
-
-	HAL_TIM_Base_Start(&htim3);
-}
-
 void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
-	HAL_TIM_Base_Stop(&htim3);
 
-//	for(dmaBufIdx; dmaBufIdx < 5+ start; dmaBufIdx++){
-//		b[dmaBufIdx] = buf[dmaBufIdx];
-//	}
+	//keep track of written buf count
+//	buf[0][0] = bufIdx++;
+bufIdx++;
+	f_write(&fil, buf[0], BUFF_SIZE, &bw);
 
-	stamps[1][stampsIdx++] = htim4.Instance->CNT;
-
+/*
 //	for(int i = 0 ; i < BUFF_SIZE; i++){
 //		buf2[0][i] = buf[0][i];
 //	}
 
+	HAL_TIM_Base_Stop(&htim3);
+
+	stamps[1][stampsIdx++] = htim4.Instance->CNT;
+
 	HAL_TIM_Base_Start(&htim3);
+	*/
+}
+
+//daj delay w conv cplt, zlap to w tim4 period elapsed i sprawdz czy w buf[0]
+// pojawiaja sie nowe wartowsci
+//dodaj zapis tablicy z timestampami w callback dma
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
+//	buf[1][0] = bufIdx++;
+bufIdx++;
+	f_write(&fil, buf[1], BUFF_SIZE, &bw);
+
+	HAL_TIM_Base_Stop(&htim3);
+
+	f_sync(&fil);
+
+	HAL_TIM_Base_Start(&htim3);
+
+	/*
+	for(int i  = 0; i < BUFF_SIZE; i++){
+		buf2[1][i] = buf[1][i];
+	}
+
+	HAL_TIM_Base_Stop(&htim3);
+
+	stamps[0][stampsIdx++] = htim4.Instance->CNT;
+	HAL_TIM_Base_Start(&htim3);
+	*/
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	//check if without dma and big buff to write timer int would be blocked
-	//put cnt in int and check if it increments
 
-//	if (htim->Instance == htim3.Instance){	//8khz
-//		if(writeCnt <32){
-//
-//			//split code
-//			//move adc to one timer
-//			//move sd to another timer
-//
-//			buf[bufIdx][bufCnt++] = HAL_ADC_GetValue(&hadc1);
-//
-//			HAL_ADC_Start(&hadc1);
-//			if(bufCnt >= BUFF_SIZE){ // 64ms full
-//				bufIdx = (~bufIdx)&1;
-//				bufCnt = 0;
-//				stamps[stampsIdx++] = htim4.Instance->CNT;
-//			}
-//		}
-//	}
-
-
-
-	if (htim->Instance == htim4.Instance){	//1hz
+	if (htim->Instance == htim4.Instance && bufIdx > 62){	//1hz
 
 		HAL_TIM_Base_Stop(&htim3);
 		HAL_TIM_Base_Stop(&htim4);
 
+		f_close(&fil);
+//		blink_good(5);
 
-		HAL_TIM_Base_Start(&htim3);
-		HAL_TIM_Base_Start_IT(&htim4);
 
+//		HAL_TIM_Base_Start(&htim3);
+//		HAL_TIM_Base_Start_IT(&htim4);
+/*
 //		if(writeCnt <32){
 	//			HAL_TIM_Base_Stop_IT(&htim3);
 	//			HAL_TIM_Base_Stop_IT(&htim4);
@@ -600,7 +578,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 //		}
 //		htim4.Instance->CNT = 0;
 	} // if tim4
-
+	*/
+	}
 }
 
 void DMA1_Stream3_IRQHandler(DMA_HandleTypeDef *hdma){
