@@ -37,6 +37,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define BUFF_SIZE 512
+#define RECORD_SIZE 30
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -112,7 +113,7 @@ FATFS *pfs;
 DWORD fre_clust;
 uint32_t total, free_space;
 
-volatile uint8_t bufIdx;
+volatile uint8_t bufIdx, recordDone, enableBlink;
 volatile uint16_t bufCnt;
 //uint8_t buf[2][BUFF_SIZE];
 uint8_t buf[2][BUFF_SIZE];
@@ -159,13 +160,14 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-  uint8_t wavHeader[] = {0x52, 0x49, 0x46, 0x46, 0x24, 0x88, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74, 0x20,
-		  0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x40, 0x1f, 0x00, 0x00, 0x40, 0x1f, 0x00, 0x00,
-		  0x01, 0x00, 0x08, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x88, 0x00, 0x00};
+  uint8_t wavHeader[] = {0x52, 0x49, 0x46, 0x46, 0x24, 0x2c, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74, 0x20,
+		  0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x80, 0x3e, 0x00, 0x00, 0x80, 0x3e, 0x00, 0x00,
+		  0x01, 0x00, 0x08, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x2c, 0x01, 0x00};
   bufIdx = 0;
-
+  recordDone = 0;
+  enableBlink = 0;
     fresult = f_mount(&fs, "", 0);
-	fresult = f_open(&fil, "f1.wav", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
+	fresult = f_open(&fil, "f12.wav", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
 	if(fresult != FR_OK)
 		blink_bad();
 
@@ -219,7 +221,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  blink_beacon();
+	  if(enableBlink)
+		  blink_beacon();
   }
   /* USER CODE END 3 */
 }
@@ -373,7 +376,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 9-1;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 1000-1;
+  htim3.Init.Period = 500-1;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -418,7 +421,7 @@ static void MX_TIM4_Init(void)
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 7200-1;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 10000-1;
+  htim4.Init.Period = 5000-1;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
@@ -498,57 +501,50 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
-
-	//keep track of written buf count
-//	buf[0][0] = bufIdx++;
-bufIdx++;
 	f_write(&fil, buf[0], BUFF_SIZE, &bw);
-
-/*
-//	for(int i = 0 ; i < BUFF_SIZE; i++){
-//		buf2[0][i] = buf[0][i];
-//	}
-
-	HAL_TIM_Base_Stop(&htim3);
-
-	stamps[1][stampsIdx++] = htim4.Instance->CNT;
-
-	HAL_TIM_Base_Start(&htim3);
-	*/
 }
 
 //daj delay w conv cplt, zlap to w tim4 period elapsed i sprawdz czy w buf[0]
 // pojawiaja sie nowe wartowsci
 //dodaj zapis tablicy z timestampami w callback dma
+//dodaj cnt marker co 10 zapis
+
+//debug clk, dodaj osobny pin i sprawdzaj go na lgic
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
-//	buf[1][0] = bufIdx++;
-bufIdx++;
+	bufIdx++;
+
 	f_write(&fil, buf[1], BUFF_SIZE, &bw);
 
-	HAL_TIM_Base_Stop(&htim3);
+//	f_sync(&fil);
 
-	f_sync(&fil);
-
-	HAL_TIM_Base_Start(&htim3);
-
-	/*
-	for(int i  = 0; i < BUFF_SIZE; i++){
-		buf2[1][i] = buf[1][i];
+	if(bufIdx > RECORD_SIZE){
+		HAL_TIM_Base_Stop(&htim3);
+		recordDone++;
+		enableBlink++;
 	}
-
-	HAL_TIM_Base_Stop(&htim3);
-
-	stamps[0][stampsIdx++] = htim4.Instance->CNT;
-	HAL_TIM_Base_Start(&htim3);
-	*/
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
-	if (htim->Instance == htim4.Instance && bufIdx > 62){	//1hz
-
-		HAL_TIM_Base_Stop(&htim3);
+	if (htim->Instance == htim4.Instance && recordDone){	//1hz
 		HAL_TIM_Base_Stop(&htim4);
+
+		uint32_t fsize = RECORD_SIZE * 2 * 512;
+
+		uint8_t size1 = (fsize%256);
+		uint16_t size2 = fsize%65536;
+		uint8_t size3 = (fsize-size2)>>16;
+		size2 = (size2)>>8;
+
+		uint8_t chunkSize[] = {size1+36, size2, size3};
+		uint8_t subChunkSize[] = {size1, size2, size3};
+
+		f_lseek(&fil, 4);
+		f_write(&fil, chunkSize, 3, &bw);
+		f_lseek(&fil, 40);
+		f_write(&fil, subChunkSize, 3, &bw);
+
+		recordDone = 0;
 
 		f_close(&fil);
 //		blink_good(5);

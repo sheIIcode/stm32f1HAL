@@ -2844,11 +2844,11 @@ FRESULT f_write (
 				fp->fs->winsect = sect;
 			}
 #else
-			if (fp->dsect != sect) {		/* Fill sector cache with file data */
-				if (fp->fptr < fp->fsize &&
-					disk_read(fp->fs->drv, fp->buf.d8, sect, 1) != RES_OK)
-						ABORT(fp->fs, FR_DISK_ERR);
-			}
+//			if (fp->dsect != sect) {		/* Fill sector cache with file data */
+//				if (fp->fptr < fp->fsize &&
+//					disk_read(fp->fs->drv, fp->buf.d8, sect, 1) != RES_OK)
+//						ABORT(fp->fs, FR_DISK_ERR);
+//			}
 #endif
 			fp->dsect = sect;
 		}
@@ -3109,7 +3109,6 @@ FRESULT f_lseek (
 #if _USE_FASTSEEK
 	DWORD cl, pcl, ncl, tcl, dsc, tlen, ulen, *tbl;
 #endif
-
 
 	res = validate(fp);					/* Check validity of the object */
 	if (res != FR_OK) LEAVE_FF(fp->fs, res);
