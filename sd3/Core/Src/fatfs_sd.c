@@ -203,13 +203,13 @@ static bool SD_TxDataBlock(const uint8_t *buff, BYTE token)
 		}
 
 		/* recv buffer clear */
-		SPI_RxByte();
-		SPI_RxByte();
-
-		if(TIM4->CR1 & TIM_CR1_CEN){
-			uint16_t start = TIM4->CNT;
-			while(TIM4->CNT < start + 50);
-		}
+//		SPI_RxByte();
+//		SPI_RxByte();
+//
+//		if(TIM4->CR1 & TIM_CR1_CEN){
+//			uint16_t start = TIM4->CNT;
+//			while(TIM4->CNT < start + 50);
+//		}
 
 		while (SPI_RxByte() == 0);
 	}

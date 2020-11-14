@@ -36,8 +36,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define BUFF_SIZE 512
-#define RECORD_SIZE 30
+#define BUFF_SIZE 4096
+#define RECORD_SIZE 15
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -116,11 +116,8 @@ uint32_t total, free_space;
 volatile uint8_t bufIdx, recordDone, enableBlink;
 volatile uint16_t bufCnt;
 //uint8_t buf[2][BUFF_SIZE];
-uint16_t buf[2][BUFF_SIZE];
-//uint8_t buf2[2][BUFF_SIZE];
-//uint16_t stamps[2][64];
-//volatile uint8_t stampsIdx;
-//volatile uint8_t b[BUFF_SIZE];
+//uint16_t buf[2][BUFF_SIZE];
+uint16_t buf[BUFF_SIZE];
 
 /* USER CODE END 0 */
 
@@ -160,7 +157,7 @@ int main(void)
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
-  uint8_t wavHeader[] = {0x52, 0x49, 0x46, 0x46, 0x24, 0x2c, 0x00, 0x00,
+  uint8_t wavHeader[] = {0x52, 0x49, 0x46, 0x46, 0xc4, 0x32, 0x01, 0x00,
 		  0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74, 0x20, //wave fmt
 		  0x10, 0x00, 0x00, 0x00, //subchunk
 		  0x01, 0x00,
@@ -170,7 +167,7 @@ int main(void)
 		  0x02, 0x00, //block align
 		  0x10, 0x00, //bits per sample
 		  0x64, 0x61, 0x74, 0x61, // data
-		  0x00, 0x2c, 0x01, 0x00 // size of data
+		  0xa0, 0x32, 0x01, 0x00 // size of data
   };
   bufIdx = 0;
   recordDone = 0;
@@ -190,8 +187,8 @@ int main(void)
 
 	HAL_TIM_Base_Start(&htim3);
 
-	HAL_ADC_Start_DMA(&hadc1, (uint16_t*)buf, 2*BUFF_SIZE);
-
+//	HAL_ADC_Start_DMA(&hadc1, (uint16_t*)buf, 2*BUFF_SIZE);
+	HAL_ADC_Start_DMA(&hadc1, (uint16_t*)buf, BUFF_SIZE);
 	//for 8bit left shifted ADC read, move periph pointer by one byte to get ADC highbyte
 //	uint32_t ADC_DR = hdma_adc1.Instance->CPAR;
 //	hdma_adc1.Instance->CPAR = ADC_DR+1;
@@ -281,7 +278,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T3_TRGO;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_LEFT;
   hadc1.Init.NbrOfConversion = 1;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -487,8 +484,8 @@ static void MX_GPIO_Init(void)
 
 void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
 //	HAL_TIM_Base_Stop(&htim3);
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-	f_write(&fil, buf[0], 1024, &bw);
+//	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+//	f_write(&fil, buf[0], 1024, &bw);
 //	HAL_TIM_Base_Start(&htim3);
 }
 
@@ -497,13 +494,33 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
 
 //daj ifa zeby sprowadzac wszystko z 126-129 do 127
 
+//cofnij do 8bit, zapis do ram i pozniej bulk do sd
+
+//sprawdz czy po zapisie trzeba SPI_RxByte
+
+//licz do mikrofonu, sprawdz czy wskaznik w pliku nie wraca na poczatek
+
+//converter w python do rollover
+
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
 	bufIdx++;
 
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
+//	uint16_t start = TIM4->CNT;
+
+	for(uint16_t i = 0 ; i < 4096; i++){
+//		*(buf + i) = *(buf + i) >> 2;
+		buf[i] = buf[i] >> 1;
+	}
+
+	buf[0] = bufIdx;
+
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+
 //	HAL_TIM_Base_Stop(&htim3);
-	f_write(&fil, buf[1], 1024, &bw);
+//	f_write(&fil, buf[1], 1024, &bw);
+	f_write(&fil, buf, BUFF_SIZE, &bw);
 //	HAL_TIM_Base_Start(&htim3);
 
 //	f_sync(&fil);
@@ -520,7 +537,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if (htim->Instance == htim4.Instance && recordDone){	//1hz
 		HAL_TIM_Base_Stop(&htim4);
 
-		uint32_t fsize = RECORD_SIZE * 2 * 2 * 512;
+//		uint32_t fsize = RECORD_SIZE * 2 * 2 * 512;
+		uint32_t fsize = RECORD_SIZE * 2 * BUFF_SIZE;
 
 		uint8_t size1 = (fsize%256);
 		uint16_t size2 = fsize%65536;
