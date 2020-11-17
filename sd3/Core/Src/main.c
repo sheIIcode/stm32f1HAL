@@ -37,7 +37,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define BUFF_SIZE 4096
-#define RECORD_SIZE 15
+#define RECORD_SIZE 60
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -502,26 +502,39 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
 
 //converter w python do rollover
 
+//popraw kalkulowanie pliku
+
+//normalny sygnal przy 16bit ma max amp 100
+
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
 	bufIdx++;
 
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
 //	uint16_t start = TIM4->CNT;
+	HAL_TIM_Base_Stop(&htim3);
+//	uint16_t dc = 0x3fff; // 16k dla buf >> 1
 
-	for(uint16_t i = 0 ; i < 4096; i++){
+	for(uint16_t i = 0 ; i < BUFF_SIZE; i++){
 //		*(buf + i) = *(buf + i) >> 2;
-		buf[i] = buf[i] >> 1;
-	}
+//		uint16_t num = buf[i];
 
-	buf[0] = bufIdx;
+//		if(num - dc*2 > 400){//1729
+//			buf[i] = dc;
+//			continue;
+//		}
+//
+//		buf[i] = dc + (((buf[i]>>1) - dc) << 6);
+
+		buf[i] = buf[i]>>1;
+	}
 
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
 
-//	HAL_TIM_Base_Stop(&htim3);
+
 //	f_write(&fil, buf[1], 1024, &bw);
-	f_write(&fil, buf, BUFF_SIZE, &bw);
-//	HAL_TIM_Base_Start(&htim3);
+	f_write(&fil, buf, sizeof(buf), &bw);
+	HAL_TIM_Base_Start(&htim3);
 
 //	f_sync(&fil);
 

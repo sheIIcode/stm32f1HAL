@@ -2782,8 +2782,10 @@ FRESULT f_write (
 
 	for ( ;  btw;							/* Repeat until all data written */
 		wbuff += wcnt, fp->fptr += wcnt, *bw += wcnt, btw -= wcnt) {
+
 		if ((fp->fptr % SS(fp->fs)) == 0) {	/* On the sector boundary? */
 			csect = (BYTE)(fp->fptr / SS(fp->fs) & (fp->fs->csize - 1));	/* Sector offset in the cluster */
+
 			if (!csect) {					/* On the cluster boundary? */
 				if (fp->fptr == 0) {		/* On the top of the file? */
 					clst = fp->sclust;		/* Follow from the origin */
@@ -2802,7 +2804,7 @@ FRESULT f_write (
 				if (clst == 0xFFFFFFFF) ABORT(fp->fs, FR_DISK_ERR);
 				fp->clust = clst;			/* Update current cluster */
 				if (fp->sclust == 0) fp->sclust = clst;	/* Set start cluster if the first write */
-			}
+			}// if on cluster bound
 #if _FS_TINY
 			if (fp->fs->winsect == fp->dsect && sync_window(fp->fs))	/* Write-back sector cache */
 				ABORT(fp->fs, FR_DISK_ERR);
@@ -2817,6 +2819,7 @@ FRESULT f_write (
 			if (!sect) ABORT(fp->fs, FR_INT_ERR);
 			sect += csect;
 			cc = btw / SS(fp->fs);			/* When remaining bytes >= sector size, */
+
 			if (cc) {						/* Write maximum contiguous sectors directly */
 				if (csect + cc > fp->fs->csize)	/* Clip at cluster boundary */
 					cc = fp->fs->csize - csect;
@@ -2838,6 +2841,7 @@ FRESULT f_write (
 				wcnt = SS(fp->fs) * cc;		/* Number of bytes transferred */
 				continue;
 			}
+
 #if _FS_TINY
 			if (fp->fptr >= fp->fsize) {	/* Avoid silly cache filling at growing edge */
 				if (sync_window(fp->fs)) ABORT(fp->fs, FR_DISK_ERR);
@@ -2851,7 +2855,8 @@ FRESULT f_write (
 //			}
 #endif
 			fp->dsect = sect;
-		}
+		} // first if in for loop
+
 		wcnt = SS(fp->fs) - ((UINT)fp->fptr % SS(fp->fs));/* Put partial sector into file I/O buffer */
 		if (wcnt > btw) wcnt = btw;
 #if _FS_TINY
