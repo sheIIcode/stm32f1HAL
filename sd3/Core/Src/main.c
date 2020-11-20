@@ -37,7 +37,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define BUFF_SIZE 4096
-#define RECORD_SIZE 60
+#define RECORD_SIZE 16
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -114,10 +114,9 @@ DWORD fre_clust;
 uint32_t total, free_space;
 
 volatile uint8_t bufIdx, recordDone, enableBlink;
-volatile uint16_t bufCnt;
 //uint8_t buf[2][BUFF_SIZE];
 //uint16_t buf[2][BUFF_SIZE];
-uint16_t buf[BUFF_SIZE];
+uint8_t buf[BUFF_SIZE];
 
 /* USER CODE END 0 */
 
@@ -163,9 +162,9 @@ int main(void)
 		  0x01, 0x00,
 		  0x01, 0x00, //num of channels
 		  0x80, 0x3e, 0x00, 0x00,
-		  0x00, 0x7d, 0x00, 0x00, // byterate
-		  0x02, 0x00, //block align
-		  0x10, 0x00, //bits per sample
+		  0x80, 0x3e, 0x00, 0x00, // byterate
+		  0x01, 0x00, //block align, bytes per sample
+		  0x08, 0x00, //bits per sample
 		  0x64, 0x61, 0x74, 0x61, // data
 		  0xa0, 0x32, 0x01, 0x00 // size of data
   };
@@ -190,8 +189,8 @@ int main(void)
 //	HAL_ADC_Start_DMA(&hadc1, (uint16_t*)buf, 2*BUFF_SIZE);
 	HAL_ADC_Start_DMA(&hadc1, (uint16_t*)buf, BUFF_SIZE);
 	//for 8bit left shifted ADC read, move periph pointer by one byte to get ADC highbyte
-//	uint32_t ADC_DR = hdma_adc1.Instance->CPAR;
-//	hdma_adc1.Instance->CPAR = ADC_DR+1;
+	uint32_t ADC_DR = hdma_adc1.Instance->CPAR;
+	hdma_adc1.Instance->CPAR = ADC_DR+1;
 
 
   /* USER CODE END 2 */
@@ -401,9 +400,9 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 7200-1;
+  htim4.Init.Prescaler = 7200;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 5000-1;
+  htim4.Init.Period = 5000;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
@@ -506,6 +505,8 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc){
 
 //normalny sygnal przy 16bit ma max amp 100
 
+//8bit dc 128, skok do 131 przy zapisie
+
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
 	bufIdx++;
 
@@ -515,18 +516,24 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
 	HAL_TIM_Base_Stop(&htim3);
 //	uint16_t dc = 0x3fff; // 16k dla buf >> 1
 
-	for(uint16_t i = 0 ; i < BUFF_SIZE; i++){
-//		*(buf + i) = *(buf + i) >> 2;
-//		uint16_t num = buf[i];
-
-//		if(num - dc*2 > 400){//1729
-//			buf[i] = dc;
-//			continue;
-//		}
+//	for(uint16_t i = 0 ; i < BUFF_SIZE; i++){
+////		*(buf + i) = *(buf + i) >> 2;
+////		uint16_t num = buf[i];
 //
-//		buf[i] = dc + (((buf[i]>>1) - dc) << 6);
+////		if(num - dc*2 > 400){//1729
+////			buf[i] = dc;
+////			continue;
+////		}
+////
+////		buf[i] = dc + (((buf[i]>>1) - dc) << 6);
+//
+//		buf[i] = buf[i]>>1;
+//	}
 
-		buf[i] = buf[i]>>1;
+	uint8_t prev = 0;
+	for(uint16_t i = 0 ; i < BUFF_SIZE; i++){
+		if(abs(buf[i+1]-buf[i]) >= 3)
+			buf[i]= 128;
 	}
 
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
