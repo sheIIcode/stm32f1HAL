@@ -20,7 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usb_device.h"
-
+#include "usbd_cdc.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -101,7 +101,9 @@ int main(void)
 	  HAL_Delay(203);
 	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 //	  USART2->DR = 48;
-	  CDC_Transmit_FS("hello\n", 6);
+//	  CDC_Transmit_FS("hello\n", 6);
+	  USBD_CDC_SetTxBuffer(USBD_HandleTypeDef *pdev, uint8_t *pbuff,
+	                               uint32_t length);
   }
   /* USER CODE END 3 */
 }
