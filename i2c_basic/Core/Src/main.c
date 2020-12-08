@@ -6,7 +6,7 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
+  * <h2><center>&copy; Copyright (c) 2020 STMicroelectronics.
   * All rights reserved.</center></h2>
   *
   * This software component is licensed by ST under BSD 3-Clause license,
@@ -15,30 +15,14 @@
   *                        opensource.org/licenses/BSD-3-Clause
   *
   ******************************************************************************
-  PINOUT:
-  PB10 - SCL
-  PC12 - SDA
-
-
-	TODO:
-	communication arduiono - stm to read i2c regs
-	add new usart for arduino
-	setup arduino
-	enable frame sending
   */
 /* USER CODE END Header */
-
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "ssd1306_tests.h"
-#include <string.h>
-#include "dwt_delay.h"
 #include "regs.h"
-
-#define SSD1306_USE_I2C 1
 #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
 /* USER CODE END Includes */
 
@@ -49,7 +33,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -61,26 +44,20 @@
 I2C_HandleTypeDef hi2c2;
 
 TIM_HandleTypeDef htim2;
-TIM_HandleTypeDef htim6;
+TIM_HandleTypeDef htim4;
 
-UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
-#define ROWS 240
+
+#define ROWS 360
 #define PIXS 324
 #define UART_BUFFER_SIZE 7
 
-volatile uint16_t vsCnt, pxCnt;
+volatile uint16_t pxCnt;
 volatile uint16_t line;
-
-uint8_t Received[UART_BUFFER_SIZE];
-
-//uint8_t tab[ROWS][PIXS];
-//uint8_t tab[PIXS];
 uint8_t data[PIXS];
-
 
 /* USER CODE END PV */
 
@@ -91,15 +68,13 @@ static void MX_DMA_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
-static void MX_TIM6_Init(void);
-static void MX_USART1_UART_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 void init() {
 	for(int i = 0; i < 198 ; i ++){
 		HAL_I2C_Mem_Write(&hi2c2, (0x21<<1), OV7670_reg[i][0], 1, &OV7670_reg[i][1], 1, 100);
@@ -110,20 +85,43 @@ void init() {
 
 //void UART_DMATransmitCplt(DMA_HandleTypeDef *hdma){
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart){
-	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+//	uint8_t reg = huart->Instance->SR & (UART_FLAG_TXE | UART_FLAG_TC);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, RESET);
+//	sentCnt++;
 }
+
+//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+//	data[pxCnt] = 32 + (pxCnt++ % 90);
+//
+//	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+//
+//
+//	if(pxCnt == 320){
+//		data[0] = 48 + sentCnt;
+//		for (int i = 0 ; i < 4; i++)
+//			data[1+i] = "=";
+////		HAL_UART_Transmit_DMA(&huart2, data, 320);
+//		HAL_UART_Transmit_IT(&huart2, data, 320);
+//		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, SET);
+//	}
+//	pxCnt %= 320;
+//}
+
 /* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
   * @retval int
   */
+
+// general questions:
+//what happens when line is high and int happens, will it
+// get out of while or it is forced to wait
 int main(void)
 {
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
-  
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -147,15 +145,14 @@ int main(void)
   MX_I2C2_Init();
   MX_USART2_UART_Init();
   MX_TIM2_Init();
-  MX_TIM6_Init();
-  MX_USART1_UART_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
 //  HAL_TIM_Base_Start_IT(&htim6);
   HAL_TIM_Base_Start(&htim2);
   HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
-//  HAL_UART_Receive_IT(&huart1, &Received, UART_BUFFER_SIZE);
-//  HAL_UART_Transmit_DMA(&huart1, &data, PIXS);
+
+//  HAL_TIM_Base_Start_IT(&htim4);
 
   HAL_Delay(100);
   init();
@@ -171,6 +168,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  // send info from python which lines are broken, resend, hold until all ok
+
 	  while(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_10) == GPIO_PIN_SET );
 	  while(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_10) == GPIO_PIN_RESET );
 
@@ -182,46 +180,38 @@ int main(void)
 			 while( (GPIOC->IDR & GPIO_PIN_8) == GPIO_PIN_8 );
 
 			 while( (GPIOC->IDR & GPIO_PIN_8) == 0 );
-//			 tab[line][pxCnt++] = (GPIOC->IDR & 0xff);
-			 data[pxCnt++] = (GPIOC->IDR & 0xff);
+			 data[pxCnt++] = (GPIOB->IDR & 0xff);
+
+			 if(pxCnt> 319){
+				 data[3] = pxCnt;
+				 data[2] = line%255;
+				 data[0] = 10;
+
+				 HAL_UART_Transmit_DMA(&huart2, data, 320);
+				 HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, SET);
+
+				 break;
+			 }
 			 while( (GPIOC->IDR & GPIO_PIN_8) == GPIO_PIN_8 );
 		 }
 
-		 data[PIXS-3] = 0;
-		 data[PIXS-2] = 0;
-		 data[PIXS-1] = line;
-		 data[PIXS] = "\n";
-
+		 HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 		 pxCnt = 0;
-		 HAL_UART_Transmit_DMA(&huart2, &data, PIXS);
-
-		 if(line == 0){
-			 HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_11);
-			 HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_11);
-		 }
 
 		 if(++line > ROWS){
 			 break;
 		 }
-		 //line low
+		 //line low, waiting for netx img
 		 while( HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9) == GPIO_PIN_RESET && (line < ROWS));
 
 	  }//end of VS
 
-		 HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_11);
+	  line = 0;
+//	 for(int i = 0; i< 320; i++){
+//		 data[i] = i%256;
+//	 }
 
-//			for(uint8_t i = 0; i < ROWS; i++){
-//				printf("[%d,", i);
-//				for(uint16_t j = 0; j < PIXS; j += 4){
-//					uint32_t n = (tab[i][j] << 24) | (tab[i][j+1] << 16) | (tab[i][j+2] << 8) | tab[i][j+3];
-//					printf("%08x,", n);
-//
-//				}
-//				printf("%d\r\n", i);
-//			}
-		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_11);
 
-		line = 0;
 
 	 }// MAIN while
   /* USER CODE END 3 */
@@ -236,11 +226,12 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /** Configure the main internal regulator output voltage 
+  /** Configure the main internal regulator output voltage
   */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
@@ -256,13 +247,13 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /** Activate the Over-Drive mode 
+  /** Activate the Over-Drive mode
   */
   if (HAL_PWREx_EnableOverDrive() != HAL_OK)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -371,74 +362,47 @@ static void MX_TIM2_Init(void)
 }
 
 /**
-  * @brief TIM6 Initialization Function
+  * @brief TIM4 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM6_Init(void)
+static void MX_TIM4_Init(void)
 {
 
-  /* USER CODE BEGIN TIM6_Init 0 */
+  /* USER CODE BEGIN TIM4_Init 0 */
 
-  /* USER CODE END TIM6_Init 0 */
+  /* USER CODE END TIM4_Init 0 */
 
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-  /* USER CODE BEGIN TIM6_Init 1 */
-
-  /* USER CODE END TIM6_Init 1 */
-  htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 9000;
-  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 10000;
-  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  /* USER CODE BEGIN TIM4_Init 1 */
+  //tim clk is 90mhz
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 9000;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 100;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM6_Init 2 */
-  printf("tim setup done 6\r\n");
+  /* USER CODE BEGIN TIM4_Init 2 */
 
-  /* USER CODE END TIM6_Init 2 */
-
-}
-
-/**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
+  /* USER CODE END TIM4_Init 2 */
 
 }
 
@@ -458,7 +422,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 1000000;
+  huart2.Init.BaudRate = 2000000;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -475,11 +439,12 @@ static void MX_USART2_UART_Init(void)
 
 }
 
-/** 
+/**
   * Enable DMA controller clock
   */
-static void MX_DMA_Init(void) 
+static void MX_DMA_Init(void)
 {
+
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
 
@@ -505,19 +470,16 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PC0 PC1 PC2 PC3 
-                           PC4 PC5 PC6 PC7 
-                           PC8 PC9 PC10 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3 
-                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7 
-                          |GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pin : PC3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA5 */
@@ -527,60 +489,23 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PC11 */
-  GPIO_InitStruct.Pin = GPIO_PIN_11;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  /*Configure GPIO pins : PB0 PB1 PB2 PB3
+                           PB4 PB5 PB6 PB7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
+                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PC8 PC9 PC10 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
 }
 
 /* USER CODE BEGIN 4 */
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-	char * token = strtok(Received, ",");
-	uint8_t reg = atoi(token,10);
-	token = strtok(NULL, ",");
-	uint8_t val = atoi(token, 10);
-
-	uint8_t string_size;
-
-	uint8_t string_to_send[32];
-	string_size = sprintf(string_to_send, "reg: %d, val: %d\n\r", reg, val);
-	HAL_UART_Transmit(&huart1, string_to_send, string_size, 100);
-
-	HAL_I2C_Mem_Read(&hi2c2, (0x21<<1), reg, 1, &data, 1, 100);
-	string_size = sprintf(string_to_send, "before reg: %d, val: %d\n\r", reg, data);
-	HAL_UART_Transmit(&huart1, string_to_send, string_size, 100);
-
-	HAL_I2C_Mem_Write(&hi2c2, (0x21<<1), reg, 1, val, 1, 100);
-
-	HAL_I2C_Mem_Read(&hi2c2, (0x21<<1), reg, 1, &data, 1, 100);
-	string_size = sprintf(string_to_send, "after reg: %d, val: %d\n\r", reg, data);
-	HAL_UART_Transmit(&huart1, string_to_send, string_size, 100);
-
-	HAL_UART_Receive_IT(&huart1, &Received, UART_BUFFER_SIZE); // Ponowne włączenie nasłuchiwania
-}
-
-static inline void DWT_Delay(uint32_t us) // microseconds
-{
-    uint32_t startTick = DWT->CYCCNT,
-             delayTicks = us * (SystemCoreClock/1000000);
-
-    while (DWT->CYCCNT - startTick < delayTicks);
-}
-
-
-PUTCHAR_PROTOTYPE
-{
- /* Place your implementation of fputc here */
- /* e.g. write a character to the USART2 and Loop until the end of transmission */
- HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 1);
-
-return ch;
-}
-
 
 /* USER CODE END 4 */
 
@@ -592,7 +517,6 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-	printf("ERROR!");
 
   /* USER CODE END Error_Handler_Debug */
 }
@@ -606,7 +530,7 @@ void Error_Handler(void)
   * @retval None
   */
 void assert_failed(uint8_t *file, uint32_t line)
-{ 
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
