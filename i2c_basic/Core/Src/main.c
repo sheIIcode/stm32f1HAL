@@ -51,8 +51,9 @@ DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
 
-#define ROWS 360
-#define PIXS 324
+#define ROWS 240
+#define PIXS 320
+#define PACKET_SIZE 240
 #define UART_BUFFER_SIZE 7
 
 volatile uint16_t pxCnt;
@@ -182,13 +183,15 @@ int main(void)
 			 while( (GPIOC->IDR & GPIO_PIN_8) == 0 );
 			 data[pxCnt++] = (GPIOB->IDR & 0xff);
 
-			 if(pxCnt> 319){
+			 if(pxCnt> PACKET_SIZE){
 				 data[3] = pxCnt;
 				 data[2] = line%255;
 				 data[0] = 10;
 
-				 HAL_UART_Transmit_DMA(&huart2, data, 320);
+				 HAL_UART_Transmit_DMA(&huart2, data, 70);
 				 HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, SET);
+
+				 while( (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9) == GPIO_PIN_SET ) );
 
 				 break;
 			 }
