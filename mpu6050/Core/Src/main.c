@@ -22,7 +22,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "sd_hal_mpu6050.h"
+#include "ST7735.h"
+#include "fonts.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -167,7 +169,11 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   ST7735_Init(0);
-  ST7735_FillScreen(BLACK);
+  ST7735_FillRectangle(0, 0, ST7735_WIDTH, ST7735_HEIGHT, BLACK);
+
+  ST7735_WriteString(40, 40, "hehexd", Font_16x26, WHITE, BLACK);
+
+
 //   ST7735_SetRotation(0);
 
   SD_MPU6050_Result result ;
