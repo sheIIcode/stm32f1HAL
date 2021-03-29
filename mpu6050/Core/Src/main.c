@@ -171,8 +171,13 @@ int main(void)
   ST7735_Init(0);
   ST7735_FillRectangle(0, 0, ST7735_WIDTH, ST7735_HEIGHT, BLACK);
 
-  ST7735_WriteString(40, 40, "hehexd", Font_16x26, WHITE, BLACK);
+  ST7735_WriteString(40, 40, "hehexd", Font_7x10, WHITE, WHITE);
 
+  ST7735_WriteString(80, 80, "*", Font_16x26, WHITE, BLACK);
+
+  HAL_Delay(300);
+
+//  testCircles(15, RED);
 
 //   ST7735_SetRotation(0);
 
@@ -194,6 +199,9 @@ int main(void)
 
   set_last_read_angle_data(HAL_GetTick(), 0, 0, 0, 0, 0, 0);
   calibrate_sensors();
+
+  unsigned long t_now = 0;
+  uint8_t straccx[5];
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -203,6 +211,41 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+	  HAL_Delay(500);
+	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+
+	  double dT;
+	  SD_MPU6050_Result result = SD_MPU6050_ReadAll(&hi2c1, &mpu1);
+	  if(result == SD_MPU6050_Result_Ok)
+	  {
+		  t_now = HAL_GetTick();
+
+		  float gyro_x = (mpu1.Gyroscope_X - base_x_gyro)/FS_SEL;
+		  float gyro_y = (mpu1.Gyroscope_Y - base_y_gyro)/FS_SEL;
+		  float gyro_z = (mpu1.Gyroscope_Z - base_z_gyro)/FS_SEL;
+
+
+		  float accel_x = mpu1.Accelerometer_X;
+		  float accel_y = mpu1.Accelerometer_Y;
+		  float accel_z = mpu1.Accelerometer_Z;
+
+		  float accel_angle_y = atan(-1*accel_x/sqrt(pow(accel_y,2) + pow(accel_z,2)))*RADIANS_TO_DEGREES;
+		  float accel_angle_x = atan(accel_y/sqrt(pow(accel_x,2) + pow(accel_z,2)))*RADIANS_TO_DEGREES;
+
+		  int accel = accel_angle_x;
+		  itoa(accel, straccx, 10);
+
+		  ST7735_WriteString(40, 80, straccx, Font_16x26, WHITE, BLACK);
+
+		  HAL_Delay(10);
+
+//		  ST7735_WriteString(40, 80, straccx, Font_16x26, BLACK, BLACK);
+
+//		  ST7735_FillRectangle(0, 0, ST7735_WIDTH, ST7735_HEIGHT, BLACK);
+
+	  }
+
   }
   /* USER CODE END 3 */
 }
@@ -335,12 +378,32 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
+
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PA8 PA9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
 
