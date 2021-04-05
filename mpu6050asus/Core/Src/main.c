@@ -34,6 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define STT7735_CENTER_OFFSET 60
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -131,6 +132,23 @@ void set_last_read_angle_data(uint32_t time, float x, float y, float z, float x_
   last_gyro_y_angle = y_gyro;
   last_gyro_z_angle = z_gyro;
 }
+
+unsigned long get_last_time() {return last_read_time;}
+float get_last_x_angle() {return last_x_angle;}
+float get_last_y_angle() {return last_y_angle;}
+float get_last_z_angle() {return last_z_angle;}
+float get_last_gyro_x_angle() {return last_gyro_x_angle;}
+float get_last_gyro_y_angle() {return last_gyro_y_angle;}
+float get_last_gyro_z_angle() {return last_gyro_z_angle;}
+
+
+void st7735WriteDescriptions(){
+	ST7735_WriteString(0, 10, "gyro", Font_7x10, WHITE, BLACK);
+	ST7735_WriteString(0, 60, "accel", Font_7x10, WHITE, BLACK);
+	ST7735_WriteString(0, 110, "filter", Font_7x10, WHITE, BLACK);
+}
+
+
 /* USER CODE END 0 */
 
 /**
@@ -166,13 +184,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   ST7735_Init(0);
-   ST7735_FillRectangle(0, 0, ST7735_WIDTH, ST7735_HEIGHT, BLACK);
-
-//   ST7735_WriteString(40, 40, "hehexd", Font_7x10, WHITE, BLACK);
-
-   ST7735_WriteString(80, 100, "*", Font_16x26, WHITE, BLACK);
-
-//   HAL_Delay(300);
+//   ST7735_FillRectangle(0, 0, ST7735_WIDTH, ST7735_HEIGHT, BLACK);
+  st7735WriteDescriptions();
 
    SD_MPU6050_Result result ;
 
@@ -181,21 +194,23 @@ int main(void)
    if(result == SD_MPU6050_Result_Ok)
    {
  	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
- 	  HAL_Delay(300);
+ 	  HAL_Delay(200);
  	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
- 	  HAL_Delay(300);
+ 	  HAL_Delay(100);
  	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
- 	  HAL_Delay(300);
+ 	  HAL_Delay(200);
  	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
- 	  HAL_Delay(300);
+ 	  HAL_Delay(100);
    }
 
    set_last_read_angle_data(HAL_GetTick(), 0, 0, 0, 0, 0, 0);
    calibrate_sensors();
 
    unsigned long t_now = 0;
-   uint8_t straccx[5];
-   uint8_t stroldaccx[5];
+   uint8_t strDisplayData[3];
+
+   uint8_t stroldaccx[3], stroldaccy[3], strOldFilteredAngle[3];
+   int8_t accel = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -205,16 +220,17 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	   double dT;
 	  SD_MPU6050_Result result = SD_MPU6050_ReadAll(&hi2c1, &mpu1);
 	  if(result == SD_MPU6050_Result_Ok)
 	  {
 		  t_now = HAL_GetTick();
+		  float dt =(t_now - get_last_time())/1000.0;
+
+		  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
 		  float gyro_x = (mpu1.Gyroscope_X - base_x_gyro)/FS_SEL;
-		  float gyro_y = (mpu1.Gyroscope_Y - base_y_gyro)/FS_SEL;
-		  float gyro_z = (mpu1.Gyroscope_Z - base_z_gyro)/FS_SEL;
-
+//		  float gyro_y = (mpu1.Gyroscope_Y - base_y_gyro)/FS_SEL;
+//		  float gyro_z = (mpu1.Gyroscope_Z - base_z_gyro)/FS_SEL;
 
 		  float accel_x = mpu1.Accelerometer_X;
 		  float accel_y = mpu1.Accelerometer_Y;
@@ -223,15 +239,46 @@ int main(void)
 		  float accel_angle_y = atan(-1*accel_x/sqrt(pow(accel_y,2) + pow(accel_z,2)))*RADIANS_TO_DEGREES;
 		  float accel_angle_x = atan(accel_y/sqrt(pow(accel_x,2) + pow(accel_z,2)))*RADIANS_TO_DEGREES;
 
-		  int accel = accel_angle_x;
-		  itoa(accel, straccx, 10);
+		  //filtered angle X
+//			==========================
+		  float gyro_angle_x = gyro_x*dt + get_last_x_angle();
 
-		  ST7735_WriteString(40, 80, stroldaccx, Font_16x26, BLACK, BLACK);
-		  ST7735_WriteString(40, 80, straccx, Font_16x26, WHITE, BLACK);
+		  float alpha = 0.917;
+		  float filtered_angle_x = alpha*gyro_angle_x + (1.0 - alpha)*accel_angle_x;
 
-		  strcpy(stroldaccx, straccx);
+//		  ============================
 
-		  HAL_Delay(10);
+//		  ========== 1 ===========
+//		  accel = filtered_angle_x;
+		  accel = gyro_angle_x;
+		  itoa(accel, strDisplayData, 10);
+
+		  ST7735_WriteString(STT7735_CENTER_OFFSET, 10, stroldaccx, Font_16x26, BLACK, BLACK); // clear old string
+		  ST7735_WriteString(STT7735_CENTER_OFFSET, 10, strDisplayData, Font_16x26, WHITE, BLACK);
+		  strcpy(stroldaccx, strDisplayData);
+
+//		  ========== 2 ============
+//		  accel = accel_angle_y;
+		  accel = accel_angle_x;
+		  itoa(accel, strDisplayData, 10);
+
+		  ST7735_WriteString(STT7735_CENTER_OFFSET, 60, stroldaccy, Font_16x26, BLACK, BLACK);
+		  ST7735_WriteString(STT7735_CENTER_OFFSET, 60, strDisplayData, Font_16x26, WHITE, BLACK);
+		  strcpy(stroldaccy, strDisplayData);
+
+//		  ========== 3 =============
+		  accel = filtered_angle_x;
+		  itoa(accel, strDisplayData, 10);
+
+		  ST7735_WriteString(STT7735_CENTER_OFFSET, 110, strOldFilteredAngle, Font_16x26, BLACK, BLACK);
+		  ST7735_WriteString(STT7735_CENTER_OFFSET, 110, strDisplayData, Font_16x26, WHITE, BLACK);
+		  strcpy(strOldFilteredAngle, strDisplayData);
+
+//		  ==========================
+
+		  set_last_read_angle_data(t_now, filtered_angle_x, 0, 0, 0, 0, 0);
+
+		  HAL_Delay(40);
 	  }
 
   }
