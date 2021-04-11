@@ -25,6 +25,8 @@
 #include "sd_hal_mpu6050.h"
 #include "ST7735.h"
 #include "fonts.h"
+
+#include "servo.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +48,8 @@ I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim2;
+
 /* USER CODE BEGIN PV */
 float RADIANS_TO_DEGREES = 180/3.14159;
 float FS_SEL = 131;
@@ -56,6 +60,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 SD_MPU6050 mpu1;
 
@@ -74,6 +79,9 @@ float         last_z_angle;
 float         last_gyro_x_angle;  // Store the gyro angles to compare drift
 float         last_gyro_y_angle;
 float         last_gyro_z_angle;
+
+uint16_t angle;
+servo_t servo1;
 
 /* USER CODE END PFP */
 
@@ -166,6 +174,7 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_SPI1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
   ST7735_Init(0);
@@ -175,6 +184,7 @@ int main(void)
 
   ST7735_WriteString(80, 80, "*", Font_16x26, WHITE, BLACK);
 
+  Servo_Init(&servo1, &htim2, TIM_CHANNEL_1);
   HAL_Delay(300);
 
 //  testCircles(15, RED);
@@ -200,7 +210,6 @@ int main(void)
   set_last_read_angle_data(HAL_GetTick(), 0, 0, 0, 0, 0, 0);
   calibrate_sensors();
 
-  unsigned long t_now = 0;
   uint8_t straccx[5];
   /* USER CODE END 2 */
 
@@ -212,15 +221,11 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  HAL_Delay(500);
 	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
-	  double dT;
 	  SD_MPU6050_Result result = SD_MPU6050_ReadAll(&hi2c1, &mpu1);
 	  if(result == SD_MPU6050_Result_Ok)
 	  {
-		  t_now = HAL_GetTick();
-
 		  float gyro_x = (mpu1.Gyroscope_X - base_x_gyro)/FS_SEL;
 		  float gyro_y = (mpu1.Gyroscope_Y - base_y_gyro)/FS_SEL;
 		  float gyro_z = (mpu1.Gyroscope_Z - base_z_gyro)/FS_SEL;
@@ -234,15 +239,13 @@ int main(void)
 		  float accel_angle_x = atan(accel_y/sqrt(pow(accel_x,2) + pow(accel_z,2)))*RADIANS_TO_DEGREES;
 
 		  int accel = accel_angle_x;
+		  Servo_SetAngle(&servo1, accel);
+		  ST7735_WriteString(40, 80, straccx, Font_16x26, BLACK, BLACK);
 		  itoa(accel, straccx, 10);
 
 		  ST7735_WriteString(40, 80, straccx, Font_16x26, WHITE, BLACK);
 
 		  HAL_Delay(10);
-
-//		  ST7735_WriteString(40, 80, straccx, Font_16x26, BLACK, BLACK);
-
-//		  ST7735_FillRectangle(0, 0, ST7735_WIDTH, ST7735_HEIGHT, BLACK);
 
 	  }
 
@@ -357,6 +360,55 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 35;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 40000;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 1000;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
 
 }
 
