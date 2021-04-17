@@ -80,6 +80,22 @@ float         last_gyro_x_angle;  // Store the gyro angles to compare drift
 float         last_gyro_y_angle;
 float         last_gyro_z_angle;
 
+//PID
+float pitchTarget;
+float pitchActual;
+float pitchError;
+float pitchErrorPrev;
+float pitchServoVal;
+float pitchErrorDerivative;
+float pitchErrorIntegral;
+float pitchErrorChange;
+
+float kP, kI, kD;
+uint32_t timePrev, timeNow, dt;
+
+
+
+
 uint16_t angle;
 servo_t servo1;
 
@@ -180,12 +196,12 @@ int main(void)
   ST7735_Init(0);
   ST7735_FillRectangle(0, 0, ST7735_WIDTH, ST7735_HEIGHT, BLACK);
 
-  ST7735_WriteString(40, 40, "hehexd", Font_7x10, WHITE, WHITE);
+  ST7735_WriteString(40, 40, "1337", Font_7x10, WHITE, BLACK);
 
   ST7735_WriteString(80, 80, "*", Font_16x26, WHITE, BLACK);
 
   Servo_Init(&servo1, &htim2, TIM_CHANNEL_1);
-  HAL_Delay(300);
+  HAL_Delay(100);
 
 //  testCircles(15, RED);
 
@@ -201,16 +217,23 @@ int main(void)
 	  HAL_Delay(300);
 	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 	  HAL_Delay(300);
-	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-	  HAL_Delay(300);
-	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-	  HAL_Delay(300);
   }
 
   set_last_read_angle_data(HAL_GetTick(), 0, 0, 0, 0, 0, 0);
   calibrate_sensors();
 
+  kP = 0.5;
+  kD = 30;
+  kI = 0.00001;
+
+  pitchErrorIntegral = 0;
+  pitchErrorDerivative = 0;
+
   uint8_t straccx[5];
+  uint8_t display = 0;
+
+
+  Servo_SetAngle(&servo1, 90);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -239,16 +262,52 @@ int main(void)
 		  float accel_angle_x = atan(accel_y/sqrt(pow(accel_x,2) + pow(accel_z,2)))*RADIANS_TO_DEGREES;
 
 		  int accel = accel_angle_x;
-		  Servo_SetAngle(&servo1, accel);
-		  ST7735_WriteString(40, 80, straccx, Font_16x26, BLACK, BLACK);
-		  itoa(accel, straccx, 10);
 
-		  ST7735_WriteString(40, 80, straccx, Font_16x26, WHITE, BLACK);
+//		  ===== PID =====
+		  pitchActual = accel_angle_x;
+		  pitchError= pitchTarget - pitchActual;
 
-		  HAL_Delay(10);
+		  timeNow = HAL_GetTick();
+		  dt = timeNow - timePrev;
 
+		  if(dt >100)
+			  dt = 52;
+
+		  pitchErrorChange = pitchError - pitchErrorPrev;
+
+		  pitchErrorDerivative = pitchErrorChange/dt;
+		  pitchErrorIntegral = pitchErrorIntegral + dt*pitchError;
+
+		  pitchServoVal = pitchServoVal + kP*pitchError + kD*pitchErrorDerivative + kI*pitchErrorIntegral;
+
+		  pitchErrorPrev = pitchError;
+		  timePrev = timeNow;
+
+//		  ====== PID calculation END =========
+		  Servo_SetAngle(&servo1, pitchServoVal);
+
+		  if(display){
+			  ST7735_WriteString(40, 80, straccx, Font_16x26, BLACK, BLACK);
+			  itoa(accel, straccx, 10);
+
+			  ST7735_WriteString(40, 80, straccx, Font_16x26, WHITE, BLACK);
+
+			  int servoVal = pitchServoVal;
+			  ST7735_WriteString(40, 120, straccx, Font_16x26, BLACK, BLACK);
+			  itoa(servoVal, straccx, 10);
+			  ST7735_WriteString(40, 120, straccx, Font_16x26, WHITE, BLACK);
+		  }
+
+		  display = ~display;
+
+		  HAL_Delay(50);
+
+	  } else {
+		  SD_MPU6050_Init(&hi2c1,&mpu1,SD_MPU6050_Device_0,SD_MPU6050_Accelerometer_2G,SD_MPU6050_Gyroscope_250s );
+
+		  set_last_read_angle_data(HAL_GetTick(), 0, 0, 0, 0, 0, 0);
+		  calibrate_sensors();
 	  }
-
   }
   /* USER CODE END 3 */
 }
