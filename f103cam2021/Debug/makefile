@@ -8,7 +8,7 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
--include Drivers/STM32F4xx_HAL_Driver/Src/subdir.mk
+-include Drivers/STM32F1xx_HAL_Driver/Src/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/subdir.mk
 -include subdir.mk
@@ -30,24 +30,28 @@ endif
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
-f4_blink_debug.elf \
+f103cam2021.elf \
 
 SIZE_OUTPUT += \
 default.size.stdout \
 
 OBJDUMP_LIST += \
-f4_blink_debug.list \
+f103cam2021.list \
 
 OBJCOPY_BIN += \
-f4_blink_debug.bin \
+f103cam2021.bin \
 
 
 # All Target
-all: f4_blink_debug.elf secondary-outputs
+all:
+	+@make --no-print-directory main-build && make --no-print-directory post-build
+
+# Main-build Target
+main-build: f103cam2021.elf secondary-outputs
 
 # Tool invocations
-f4_blink_debug.elf: $(OBJS) $(USER_OBJS) C:\Users\arkadiusz.zelazowski\STMGit\stm32f1HAL\f4_blink_debug\STM32F446RETX_FLASH.ld
-	arm-none-eabi-gcc -o "f4_blink_debug.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\arkadiusz.zelazowski\STMGit\stm32f1HAL\f4_blink_debug\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="f4_blink_debug.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+f103cam2021.elf: $(OBJS) $(USER_OBJS) C:\Users\arkadiusz.zelazowski\STMGit\stm32f1HAL\f103cam2021\STM32F103C8TX_FLASH.ld
+	arm-none-eabi-gcc -o "f103cam2021.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"C:\Users\arkadiusz.zelazowski\STMGit\stm32f1HAL\f103cam2021\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="f103cam2021.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -56,13 +60,13 @@ default.size.stdout: $(EXECUTABLES)
 	@echo 'Finished building: $@'
 	@echo ' '
 
-f4_blink_debug.list: $(EXECUTABLES)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "f4_blink_debug.list"
+f103cam2021.list: $(EXECUTABLES)
+	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "f103cam2021.list"
 	@echo 'Finished building: $@'
 	@echo ' '
 
-f4_blink_debug.bin: $(EXECUTABLES)
-	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "f4_blink_debug.bin"
+f103cam2021.bin: $(EXECUTABLES)
+	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "f103cam2021.bin"
 	@echo 'Finished building: $@'
 	@echo ' '
 
@@ -71,9 +75,13 @@ clean:
 	-$(RM) *
 	-@echo ' '
 
+post-build:
+	arm-none-eabi-objcopy -O ihex f103cam2021.elf f103cam2021.hex
+	-@echo ' '
+
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST) $(OBJCOPY_BIN)
 
 .PHONY: all clean dependents
-.SECONDARY:
+.SECONDARY: post-build
 
 -include ../makefile.targets
