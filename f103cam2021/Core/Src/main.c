@@ -48,8 +48,8 @@ UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
-#define ROWS 250
-#define PIXS 150
+#define ROWS 150
+#define PIXS 160
 #define PACKET_SIZE 70
 
 volatile uint16_t pxCnt;
@@ -265,8 +265,8 @@ int main(void)
 
   /* USER CODE END 2 */
 
-  /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  /* Infinite loop */
   while (1)
   {
     /* USER CODE END WHILE */
@@ -293,24 +293,30 @@ int main(void)
 		  while(HAL_GPIO_ReadPin(HS_GPIO_Port, HS_Pin) == GPIO_PIN_RESET &&
 				  HAL_GPIO_ReadPin(VS_GPIO_Port, VS_Pin) == GPIO_PIN_RESET);
 
-		  while(HAL_GPIO_ReadPin(HS_GPIO_Port, HS_Pin) == GPIO_PIN_SET ){
-			 while( (PCLK_GPIO_Port->IDR & PCLK_Pin) == GPIO_PIN_RESET );
-				  if(pxCnt++ < PIXS)
-					  data[sendingBuffer][pxCnt] = (GPIOA->IDR == 10) ? 11 : GPIOA->IDR;
 
+		  while(HAL_GPIO_ReadPin(HS_GPIO_Port, HS_Pin) == GPIO_PIN_SET){
+//			 while( (PCLK_GPIO_Port->IDR & PCLK_Pin) == GPIO_PIN_RESET );
+			 while(HAL_GPIO_ReadPin(PCLK_GPIO_Port, PCLK_Pin) == GPIO_PIN_RESET);
+
+			 if(pxCnt < PIXS){
+				 HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+				 data[sendingBuffer][pxCnt++] = (GPIOA->IDR == 10) ? 11 : GPIOA->IDR;
+				 HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+			 }
 			 //PCLK High
-			 while( (PCLK_GPIO_Port->IDR & PCLK_Pin) == GPIO_PIN_SET );
+			 while(HAL_GPIO_ReadPin(PCLK_GPIO_Port, PCLK_Pin) == GPIO_PIN_SET);
 
 			 //PCLK Low
-			 while( (PCLK_GPIO_Port->IDR & PCLK_Pin) == GPIO_PIN_RESET );
+			 while(HAL_GPIO_ReadPin(PCLK_GPIO_Port, PCLK_Pin) == GPIO_PIN_RESET);
 
 			 //PCLK High
-			 while( (PCLK_GPIO_Port->IDR & PCLK_Pin) == GPIO_PIN_SET );
+			 while(HAL_GPIO_ReadPin(PCLK_GPIO_Port, PCLK_Pin) == GPIO_PIN_SET);
 		  }
 
 //		  notes
 //		zmien miejsce probkowania pikseli
 //		fix uart dma INT
+//		add uart reg handling
 		  data[sendingBuffer][0] = rows+11;
 		  data[sendingBuffer][1] = 1;
 		  data[sendingBuffer][2] = 1;

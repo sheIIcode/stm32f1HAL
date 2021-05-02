@@ -19,8 +19,8 @@ const uint8_t init_list[5][2] =
 //// {address, value}
 
 	{0x12,0x80},//Reset All values to defualt
-	{0x12,(0x00|0x05)},//RGB format, 2 bytes per pixel|select QVGA |  0x20 gives 224 pxs | 0x02 enables color bar
-	{0x11,0x10},//internal clk prescalar: F(int clk) = F(input clock)/(Bit[5:0]+1)
+	{0x12,(0x08|0x00)},//RGB format, 2 bytes per pixel|select QVGA |  0x20 gives 224 pxs | 0x02 enables color bar
+	{0x11,0x0c},//internal clk prescalar: F(int clk) = F(input clock)/(Bit[5:0]+1)
 	{0x13, 0x00}, // disable agc and other shit
 	{0x6b,0x0A},//bypass PLL for lower frequency, this is the default value
 //	{0x42,0x02} // enable color bar | breaks cam?
