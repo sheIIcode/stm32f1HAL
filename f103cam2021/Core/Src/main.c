@@ -62,8 +62,8 @@ UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
-#define ROWS 150
-#define PIXS 250
+#define ROWS 100
+#define PIXS 100
 
 volatile uint16_t pxCnt;
 volatile uint16_t rows;
@@ -360,6 +360,11 @@ int main(void)
 		  data[sendingBuffer][PIXS-2] = pxCnt;
 		  data[sendingBuffer][PIXS-1] = 0x0a;
 
+		  for(uint16_t i = 0;  i < PIXS; i++){
+			  if(data[i] == 0x0a)
+				  data[i] == data[i] + 1;
+		  }
+
 		  HAL_UART_Transmit_DMA(&huart1, data[sendingBuffer], PIXS);
 
 //		  HAL_UART_Transmit_DMA(&huart1, "YOYOYOYOYO", 10);
@@ -368,7 +373,7 @@ int main(void)
 		  sendingBuffer ^= 1;
 
 		  if(rows > ROWS){
-			  HAL_Delay(10);
+			  HAL_Delay(1);
 			  HAL_UART_Transmit(&huart1, "STOP\n", 5, 100);
 			  HAL_UART_Transmit(&huart1, "STOP\n", 5, 100);
 			  HAL_UART_Transmit(&huart1, "STOP\n", 5, 100);
@@ -554,7 +559,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 512000;
+  huart1.Init.BaudRate = 500000;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
