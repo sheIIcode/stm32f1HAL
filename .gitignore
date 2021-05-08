@@ -4,3 +4,4 @@
 !*.ioc
 !*.s
 !*.gitignore
+!*.ino
