@@ -37,6 +37,20 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
+//pin setup
+// PA0-7 cam data
+//pb12 pclk
+//pb13 HS
+//pb14 VS
+
+//pa8 PXCLK tim1 ch1
+
+//pb6 clk i2c
+//pb7 data i2c
+
+//pa9 uart tx
+//pa10 uart rx
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -49,8 +63,7 @@ DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 #define ROWS 150
-#define PIXS 160
-#define PACKET_SIZE 70
+#define PIXS 250
 
 volatile uint16_t pxCnt;
 volatile uint16_t rows;
@@ -262,6 +275,10 @@ int main(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
   sendingBuffer = 0;
+  uint8_t pixelData;
+  uint8_t *ptrPixelData;
+
+  ptrPixelData = pixelData;
 
   /* USER CODE END 2 */
 
@@ -285,46 +302,61 @@ int main(void)
 
 	  rows= 0;
 
-	  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-	  HAL_Delay(2);
-	  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-
 	  while(HAL_GPIO_ReadPin(VS_GPIO_Port, VS_Pin) == GPIO_PIN_RESET ){
 		  while(HAL_GPIO_ReadPin(HS_GPIO_Port, HS_Pin) == GPIO_PIN_RESET &&
 				  HAL_GPIO_ReadPin(VS_GPIO_Port, VS_Pin) == GPIO_PIN_RESET);
 
-
+//note
+// write to data array using pointer and check timings
+//check with pin13 how long does read pin takes
+// check interrupts timings and what is enabled timer dma uart etc
+// fix stm i2c camera write
 		  while(HAL_GPIO_ReadPin(HS_GPIO_Port, HS_Pin) == GPIO_PIN_SET){
-//			 while( (PCLK_GPIO_Port->IDR & PCLK_Pin) == GPIO_PIN_RESET );
+//			 GPIOC->BSRR = GPIO_PIN_13;
+			 if(pxCnt< PIXS)
+				 pixelData = GPIOA->IDR & 0xff;
+//			 GPIOC->BSRR = (uint32_t)GPIO_PIN_13 << 16u;
+
+
+
 			 while(HAL_GPIO_ReadPin(PCLK_GPIO_Port, PCLK_Pin) == GPIO_PIN_RESET);
 
-			 if(pxCnt < PIXS){
-				 HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-				 data[sendingBuffer][pxCnt++] = (GPIOA->IDR == 10) ? 11 : GPIOA->IDR;
-				 HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-			 }
+
+
+//			 HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+
+			 //				  pixelData = (GPIOA->IDR == 10) ? 11 : GPIOA->IDR;
+
+
 			 //PCLK High
 			 while(HAL_GPIO_ReadPin(PCLK_GPIO_Port, PCLK_Pin) == GPIO_PIN_SET);
+
+			 data[sendingBuffer][pxCnt] = pixelData;
 
 			 //PCLK Low
 			 while(HAL_GPIO_ReadPin(PCLK_GPIO_Port, PCLK_Pin) == GPIO_PIN_RESET);
+			 pxCnt++;
 
 			 //PCLK High
 			 while(HAL_GPIO_ReadPin(PCLK_GPIO_Port, PCLK_Pin) == GPIO_PIN_SET);
+
 		  }
 
 //		  notes
 //		zmien miejsce probkowania pikseli
 //		fix uart dma INT
 //		add uart reg handling
+//		  use arduino to write ov7670 or fix stm i2c
+//		  read pins on PCLK pin interrupt
 		  data[sendingBuffer][0] = rows+11;
 		  data[sendingBuffer][1] = 1;
 		  data[sendingBuffer][2] = 1;
 		  data[sendingBuffer][3] = 1;
 
+		  data[sendingBuffer][PIXS-6] = 2;
 		  data[sendingBuffer][PIXS-5] = 2;
 		  data[sendingBuffer][PIXS-4] = 2;
-		  data[sendingBuffer][PIXS-3] = 2;
+		  data[sendingBuffer][PIXS-3] = pxCnt >> 8;
 		  data[sendingBuffer][PIXS-2] = pxCnt;
 		  data[sendingBuffer][PIXS-1] = 0x0a;
 
@@ -337,6 +369,8 @@ int main(void)
 
 		  if(rows > ROWS){
 			  HAL_Delay(10);
+			  HAL_UART_Transmit(&huart1, "STOP\n", 5, 100);
+			  HAL_UART_Transmit(&huart1, "STOP\n", 5, 100);
 			  HAL_UART_Transmit(&huart1, "STOP\n", 5, 100);
 
 			  while(HAL_GPIO_ReadPin(VS_GPIO_Port, VS_Pin) == GPIO_PIN_RESET );

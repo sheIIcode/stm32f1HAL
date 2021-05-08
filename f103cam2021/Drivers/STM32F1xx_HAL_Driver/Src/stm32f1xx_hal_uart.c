@@ -2548,12 +2548,12 @@ static void UART_DMATransmitCplt(DMA_HandleTypeDef *hdma)
   /* DMA Normal mode*/
   huart->gState=HAL_UART_STATE_READY;
 
-  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+//  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+//  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+//  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+//  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+//  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+//  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 
   if ((hdma->Instance->CCR & DMA_CCR_CIRC) == 0U)
   {
@@ -2568,16 +2568,16 @@ static void UART_DMATransmitCplt(DMA_HandleTypeDef *hdma)
 
   }
   /* DMA Circular mode */
-  else
-  {
+//  else
+//  {
 #if (USE_HAL_UART_REGISTER_CALLBACKS == 1)
     /*Call registered Tx complete callback*/
     huart->TxCpltCallback(huart);
 #else
     /*Call legacy weak Tx complete callback*/
-    HAL_UART_TxCpltCallback(huart);
+//    HAL_UART_TxCpltCallback(huart);
 #endif /* USE_HAL_UART_REGISTER_CALLBACKS */
-  }
+//  }
 }
 
 /**
